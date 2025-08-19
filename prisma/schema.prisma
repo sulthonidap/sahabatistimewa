@@ -1,0 +1,162 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      UserRole
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  children    Child[]    @relation("ParentChildren")
+  sessions    Session[]  @relation("TherapistSessions")
+  homework    Homework[] @relation("TherapistHomework")
+  reports     Report[]   @relation("TherapistReports")
+  salaries    Salary[]   @relation("UserSalaries")
+
+  @@map("users")
+}
+
+model Child {
+  id       String @id @default(cuid())
+  name     String
+  age      Int
+  parentId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  parent   User       @relation("ParentChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  sessions Session[]
+  homework Homework[]
+  reports  Report[]
+
+  @@map("children")
+}
+
+model Session {
+  id          String       @id @default(cuid())
+  childId     String
+  therapistId String
+  date        DateTime
+  duration    Int?
+  location    String?
+  notes       String?
+  images      String       // JSON string of image URLs
+  status      SessionStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  child     Child    @relation(fields: [childId], references: [id], onDelete: Cascade)
+  therapist User     @relation("TherapistSessions", fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Homework {
+  id          String        @id @default(cuid())
+  childId     String
+  therapistId String
+  title       String
+  description String?
+  dueDate     DateTime
+  status      HomeworkStatus @default(ASSIGNED)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  child     Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+  therapist User  @relation("TherapistHomework", fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@map("homework")
+}
+
+model Report {
+  id             String       @id @default(cuid())
+  childId        String
+  therapistId    String
+  reportType     String
+  period         String
+  summary        String?
+  recommendations String?
+  conclusion     String?
+  status         ReportStatus @default(DRAFT)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  child     Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+  therapist User  @relation("TherapistReports", fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@map("reports")
+}
+
+model Salary {
+  id           String       @id @default(cuid())
+  userId       String
+  month        Int          // 1-12
+  year         Int
+  baseSalary   Float
+  allowance    Float        @default(0)
+  bonus        Float        @default(0)
+  deductions   Float        @default(0)
+  totalSalary  Float
+  status       SalaryStatus @default(PENDING)
+  paidAt       DateTime?
+  notes        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  // Relations
+  user User @relation("UserSalaries", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("salaries")
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  PARENT
+  THERAPIST
+  PSYCHOLOGIST
+}
+
+enum SessionStatus {
+  PENDING
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum HomeworkStatus {
+  ASSIGNED
+  COMPLETED
+  OVERDUE
+}
+
+enum ReportStatus {
+  DRAFT
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  REVIEWED
+}
+
+enum SalaryStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
