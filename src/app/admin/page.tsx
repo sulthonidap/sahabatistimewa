@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Sidebar } from '@/components/layout/sidebar'
+import { ProtectedRoute } from '@/components/auth/protected-route'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -23,6 +24,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { AddUserModal } from '@/components/admin/add-user-modal'
+import { useToast } from '@/hooks/use-toast'
 
 interface User {
   id: string
@@ -63,6 +65,7 @@ export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterRole, setFilterRole] = useState('all')
   const [showAddUser, setShowAddUser] = useState(false)
+  const { toast } = useToast()
 
   // Fetch data from API
   useEffect(() => {
@@ -74,7 +77,19 @@ export default function AdminDashboard() {
       setLoading(true)
       
       // Fetch users
-      const usersResponse = await fetch('/api/users')
+      const usersResponse = await fetch('/api/users', {
+        credentials: 'include'
+      })
+      
+      if (usersResponse.status === 401) {
+        toast({
+          title: 'Sesi Berakhir',
+          description: 'Silakan login kembali untuk melanjutkan',
+          variant: 'destructive'
+        })
+        return
+      }
+      
       const usersData = await usersResponse.json()
       
       if (usersData.success) {
@@ -82,7 +97,19 @@ export default function AdminDashboard() {
       }
 
       // Fetch children
-      const childrenResponse = await fetch('/api/children')
+      const childrenResponse = await fetch('/api/children', {
+        credentials: 'include'
+      })
+      
+      if (childrenResponse.status === 401) {
+        toast({
+          title: 'Sesi Berakhir',
+          description: 'Silakan login kembali untuk melanjutkan',
+          variant: 'destructive'
+        })
+        return
+      }
+      
       const childrenData = await childrenResponse.json()
       
       if (childrenData.success) {
@@ -90,11 +117,35 @@ export default function AdminDashboard() {
       }
 
       // Fetch sessions count
-      const sessionsResponse = await fetch('/api/sessions')
+      const sessionsResponse = await fetch('/api/sessions', {
+        credentials: 'include'
+      })
+      
+      if (sessionsResponse.status === 401) {
+        toast({
+          title: 'Sesi Berakhir',
+          description: 'Silakan login kembali untuk melanjutkan',
+          variant: 'destructive'
+        })
+        return
+      }
+      
       const sessionsData = await sessionsResponse.json()
       
       // Fetch reports count
-      const reportsResponse = await fetch('/api/reports')
+      const reportsResponse = await fetch('/api/reports', {
+        credentials: 'include'
+      })
+      
+      if (reportsResponse.status === 401) {
+        toast({
+          title: 'Sesi Berakhir',
+          description: 'Silakan login kembali untuk melanjutkan',
+          variant: 'destructive'
+        })
+        return
+      }
+      
       const reportsData = await reportsResponse.json()
 
       setStats({
@@ -163,12 +214,13 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Sidebar userRole="admin" />
-      
-      {/* Main Content */}
-      <div className="lg:ml-64 pb-20 lg:pb-0">
-        <div className="p-6 lg:p-8">
+    <ProtectedRoute allowedRoles={['ADMIN']}>
+      <div className="min-h-screen bg-gray-50">
+        <Sidebar userRole="admin" />
+        
+        {/* Main Content */}
+        <div className="lg:ml-64 pb-20 lg:pb-0">
+          <div className="p-6 lg:p-8">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard Admin</h1>
@@ -415,12 +467,13 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Add User Modal */}
-      <AddUserModal 
-        isOpen={showAddUser}
-        onClose={() => setShowAddUser(false)}
-        onUserAdded={fetchData}
-      />
-    </div>
+        {/* Add User Modal */}
+        <AddUserModal 
+          isOpen={showAddUser}
+          onClose={() => setShowAddUser(false)}
+          onUserAdded={fetchData}
+        />
+      </div>
+    </ProtectedRoute>
   )
 }

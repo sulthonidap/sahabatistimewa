@@ -59,13 +59,28 @@ export function Sidebar({ userRole }: SidebarProps) {
   const pathname = usePathname()
   const items = navigationItems[userRole as keyof typeof navigationItems] || []
 
-  const handleLogout = () => {
-    // Clear localStorage
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-    
-    // Redirect to login page
-    window.location.href = '/login'
+  const handleLogout = async () => {
+    try {
+      // Call logout API to clear server-side cookie
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+    } catch (error) {
+      console.error('Logout error:', error)
+    } finally {
+      // Clear localStorage
+      localStorage.removeItem('auth-token')
+      localStorage.removeItem('user')
+      
+      // Clear cookie
+      document.cookie = 'auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      
+      // Redirect to login page
+      window.location.href = '/login'
+    }
   }
 
   return (

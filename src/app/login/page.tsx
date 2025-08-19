@@ -1,67 +1,70 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Eye, EyeOff, Heart, ArrowLeft } from 'lucide-react'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const { login, loading, error, user } = useAuth()
   const router = useRouter()
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      switch (user.role) {
+        case 'ADMIN':
+          router.push('/admin')
+          break
+        case 'PARENT':
+          router.push('/parent')
+          break
+        case 'THERAPIST':
+          router.push('/therapist')
+          break
+        case 'PSYCHOLOGIST':
+          router.push('/psychologist')
+          break
+        default:
+          router.push('/parent')
+      }
+    }
+  }, [user, router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
-    
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      })
+    await login(email, password)
+  }
 
-      const data = await response.json()
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Memeriksa status login...</p>
+        </div>
+      </div>
+    )
+  }
 
-      if (response.ok && data.success) {
-        // Store token in localStorage
-        localStorage.setItem('token', data.token)
-        localStorage.setItem('user', JSON.stringify(data.user))
-        
-        // Redirect based on user role
-        switch (data.user.role) {
-          case 'ADMIN':
-            router.push('/admin')
-            break
-          case 'PARENT':
-            router.push('/parent')
-            break
-          case 'THERAPIST':
-            router.push('/therapist')
-            break
-          case 'PSYCHOLOGIST':
-            router.push('/psychologist')
-            break
-          default:
-            router.push('/parent')
-        }
-      } else {
-        // Show error message
-        alert(data.error || 'Login gagal')
-      }
-    } catch (error) {
-      console.error('Login error:', error)
-      alert('Terjadi kesalahan saat login')
-    } finally {
-      setIsLoading(false)
-    }
+  // Don't show login form if already authenticated
+  if (user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Mengalihkan ke dashboard...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -94,6 +97,12 @@ export default function LoginPage() {
           </CardHeader>
           
           <CardContent className="space-y-6">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+            
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium text-gray-700">
@@ -153,9 +162,9 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 className="w-full h-12 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-                disabled={isLoading}
+                disabled={loading}
               >
-                {isLoading ? (
+                {loading ? (
                   <div className="flex items-center">
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                     Memproses...

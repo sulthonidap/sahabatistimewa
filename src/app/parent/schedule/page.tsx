@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { 
   Calendar,
@@ -20,99 +21,174 @@ import {
   ChevronRight,
   CheckCircle,
   AlertCircle,
-  X
+  X,
+  Loader2
 } from 'lucide-react'
-import { getChildrenByParentId, getSessionsByChildId } from '@/data/mock-data'
+import { useAuth } from '@/hooks/use-auth'
+import { useToast } from '@/hooks/use-toast'
 
 interface Session {
   id: string
   childId: string
   therapistId: string
-  date: Date
+  date: Date | string
   notes: string
   images: string[]
   status: string
-  therapistName?: string
+  therapist?: {
+    id: string
+    name: string
+    email: string
+  }
+  child?: {
+    id: string
+    name: string
+    age: number
+  }
   location?: string
   duration?: number
 }
 
 export default function ParentSchedulePage() {
-  const [selectedChild, setSelectedChild] = useState('1')
+  const [selectedChild, setSelectedChild] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(new Date())
   const [filterStatus, setFilterStatus] = useState('all')
-  const parentId = '2' // Mock parent ID
+  const [children, setChildren] = useState<any[]>([])
+  const [allSessions, setAllSessions] = useState<Session[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   
-  const children = getChildrenByParentId(parentId)
-  const allSessions = getSessionsByChildId(selectedChild)
+  const { user } = useAuth()
+  const { toast } = useToast()
+  
   const currentChild = children.find(child => child.id === selectedChild)
 
-  // Mock additional session data
-  const sessionsWithDetails: Session[] = allSessions.map(session => ({
-    ...session,
-    therapistName: 'Dr. Budi Santoso',
-    location: 'Ruang Terapi A - Lantai 2',
-    duration: 60
-  }))
-
-  // Add some upcoming sessions
-  const upcomingSessions: Session[] = [
-    {
-      id: '4',
-      childId: '1',
-      therapistId: '3',
-      date: new Date('2024-08-20'),
-      notes: 'Sesi terapi motorik halus dan koordinasi',
-      images: [],
-      status: 'scheduled',
-      therapistName: 'Dr. Budi Santoso',
-      location: 'Ruang Terapi A - Lantai 2',
-      duration: 60
-    },
-    {
-      id: '5',
-      childId: '1',
-      therapistId: '3',
-      date: new Date('2024-08-22'),
-      notes: 'Sesi terapi kognitif dan konsentrasi',
-      images: [],
-      status: 'scheduled',
-      therapistName: 'Dr. Budi Santoso',
-      location: 'Ruang Terapi B - Lantai 2',
-      duration: 45
+  // Fetch children and sessions data
+  useEffect(() => {
+    if (user?.id) {
+      fetchData()
     }
-  ]
+  }, [user])
 
-  const allSessionsWithDetails = [...sessionsWithDetails, ...upcomingSessions]
+  const fetchData = async () => {
+    if (!user?.id) return
+    
+    try {
+      setLoading(true)
+      setError('')
+
+      // Fetch children for this parent
+      const childrenResponse = await fetch('/api/children', {
+        credentials: 'include'
+      })
+
+      if (childrenResponse.status === 401) {
+        toast({
+          title: 'Sesi Berakhir',
+          description: 'Silakan login kembali untuk melanjutkan',
+          variant: 'destructive'
+        })
+        return
+      }
+
+      const childrenData = await childrenResponse.json()
+      
+      if (childrenData.success) {
+        const parentChildren = childrenData.children.filter((child: any) => 
+          child.parentId === user.id
+        )
+        setChildren(parentChildren)
+        
+        // Set first child as selected if available
+        if (parentChildren.length > 0 && !selectedChild) {
+          setSelectedChild(parentChildren[0].id)
+        }
+      }
+
+    } catch (error) {
+      console.error('Error fetching data:', error)
+      setError('Gagal memuat data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Fetch sessions when selected child changes
+  useEffect(() => {
+    if (selectedChild) {
+      fetchSessions()
+    }
+  }, [selectedChild])
+
+  const fetchSessions = async () => {
+    try {
+      const response = await fetch(`/api/sessions?childId=${selectedChild}`, {
+        credentials: 'include'
+      })
+
+      if (response.status === 401) {
+        toast({
+          title: 'Sesi Berakhir',
+          description: 'Silakan login kembali untuk melanjutkan',
+          variant: 'destructive'
+        })
+        return
+      }
+
+      const data = await response.json()
+      
+      if (data.success) {
+        setAllSessions(data.sessions)
+      }
+    } catch (error) {
+      console.error('Error fetching sessions:', error)
+      toast({
+        title: 'Error',
+        description: 'Gagal memuat data sesi terapi',
+        variant: 'destructive'
+      })
+    }
+  }
 
   // Filter sessions
-  const filteredSessions = allSessionsWithDetails.filter(session => {
+  const filteredSessions = allSessions.filter(session => {
     const matchesStatus = filterStatus === 'all' || session.status === filterStatus
-    const sessionMonth = new Date(session.date).getMonth()
-    const sessionYear = new Date(session.date).getFullYear()
+    const sessionDate = new Date(session.date)
+    const sessionMonth = sessionDate.getMonth()
+    const sessionYear = sessionDate.getFullYear()
     const selectedMonthYear = selectedMonth.getMonth()
     const selectedYear = selectedMonth.getFullYear()
     const matchesMonth = sessionMonth === selectedMonthYear && sessionYear === selectedYear
     return matchesStatus && matchesMonth
   })
 
+  // Get upcoming sessions (next 7 days)
+  const today = new Date()
+  const nextWeek = new Date(today)
+  nextWeek.setDate(nextWeek.getDate() + 7)
+  
+  const upcomingSessions = allSessions.filter(session => {
+    const sessionDate = new Date(session.date)
+    return sessionDate >= today && sessionDate <= nextWeek && session.status === 'SCHEDULED'
+  })
+
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
+    switch (status.toUpperCase()) {
+      case 'COMPLETED':
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
             <CheckCircle className="w-3 h-3 mr-1" />
             Selesai
           </span>
         )
-      case 'cancelled':
+      case 'CANCELLED':
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
             <X className="w-3 h-3 mr-1" />
             Dibatalkan
           </span>
         )
-      case 'scheduled':
+      case 'SCHEDULED':
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
             <Calendar className="w-3 h-3 mr-1" />
@@ -171,6 +247,45 @@ export default function ParentSchedulePage() {
   }
 
   const days = getDaysInMonth(selectedMonth)
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Sidebar userRole="parent" />
+        <div className="lg:ml-64 pb-20 lg:pb-0">
+          <div className="p-6 lg:p-8">
+            <div className="flex items-center justify-center min-h-[400px]">
+              <div className="text-center">
+                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-purple-600" />
+                <p className="text-gray-600">Memuat jadwal terapi...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Sidebar userRole="parent" />
+        <div className="lg:ml-64 pb-20 lg:pb-0">
+          <div className="p-6 lg:p-8">
+            <div className="flex items-center justify-center min-h-[400px]">
+              <div className="text-center">
+                <AlertCircle className="w-8 h-8 mx-auto mb-4 text-red-600" />
+                <p className="text-red-600 mb-4">{error}</p>
+                <Button onClick={fetchData}>Coba Lagi</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -271,13 +386,13 @@ export default function ParentSchedulePage() {
                                   <div
                                     key={session.id}
                                     className={`text-xs p-1 rounded ${
-                                      session.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                      session.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                      session.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                                      session.status === 'CANCELLED' ? 'bg-red-100 text-red-800' :
                                       'bg-blue-100 text-blue-800'
                                     }`}
                                     title={session.notes}
                                   >
-                                    {session.date.toLocaleTimeString('id-ID', { 
+                                    {new Date(session.date).toLocaleTimeString('id-ID', { 
                                       hour: '2-digit', 
                                       minute: '2-digit' 
                                     })}
@@ -309,14 +424,34 @@ export default function ParentSchedulePage() {
                       <CardDescription>Daftar sesi {getMonthName(selectedMonth)}</CardDescription>
                     </div>
                     <Select value={filterStatus} onValueChange={setFilterStatus}>
-                      <SelectTrigger className="w-32">
+                      <SelectTrigger className="w-32 border-gray-300 focus:border-purple-500 focus:ring-purple-500 hover:border-purple-400 transition-colors">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Semua</SelectItem>
-                        <SelectItem value="scheduled">Terjadwal</SelectItem>
-                        <SelectItem value="completed">Selesai</SelectItem>
-                        <SelectItem value="cancelled">Dibatalkan</SelectItem>
+                      <SelectContent className="z-[10001] bg-white border border-gray-200 shadow-lg rounded-lg overflow-hidden" position="popper" sideOffset={4}>
+                        <SelectItem 
+                          value="all"
+                          className="cursor-pointer hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 hover:text-purple-700 focus:bg-gradient-to-r focus:from-purple-50 focus:to-pink-50 focus:text-purple-700 transition-all duration-200 ease-in-out"
+                        >
+                          Semua
+                        </SelectItem>
+                        <SelectItem 
+                          value="SCHEDULED"
+                          className="cursor-pointer hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 hover:text-purple-700 focus:bg-gradient-to-r focus:from-purple-50 focus:to-pink-50 focus:text-purple-700 transition-all duration-200 ease-in-out"
+                        >
+                          Terjadwal
+                        </SelectItem>
+                        <SelectItem 
+                          value="COMPLETED"
+                          className="cursor-pointer hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 hover:text-purple-700 focus:bg-gradient-to-r focus:from-purple-50 focus:to-pink-50 focus:text-purple-700 transition-all duration-200 ease-in-out"
+                        >
+                          Selesai
+                        </SelectItem>
+                        <SelectItem 
+                          value="CANCELLED"
+                          className="cursor-pointer hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 hover:text-purple-700 focus:bg-gradient-to-r focus:from-purple-50 focus:to-pink-50 focus:text-purple-700 transition-all duration-200 ease-in-out"
+                        >
+                          Dibatalkan
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -334,20 +469,20 @@ export default function ParentSchedulePage() {
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1">
                               <h4 className="font-medium text-gray-900 mb-1">
-                                {session.date.toLocaleDateString('id-ID', {
+                                {new Date(session.date).toLocaleDateString('id-ID', {
                                   weekday: 'long',
                                   day: 'numeric',
                                   month: 'long'
                                 })}
                               </h4>
                               <p className="text-sm text-gray-600 mb-2">
-                                {session.date.toLocaleTimeString('id-ID', { 
+                                {new Date(session.date).toLocaleTimeString('id-ID', { 
                                   hour: '2-digit', 
                                   minute: '2-digit' 
-                                })} - {session.duration} menit
+                                })} - {session.duration || 60} menit
                               </p>
                               <p className="text-xs text-gray-500 mb-2">
-                                {session.location}
+                                {session.location || 'Ruang Terapi A - Lantai 2'}
                               </p>
                               <p className="text-xs text-gray-600 line-clamp-2">
                                 {session.notes}
@@ -361,7 +496,7 @@ export default function ParentSchedulePage() {
                           <div className="flex items-center justify-between text-xs text-gray-500">
                             <div className="flex items-center">
                               <User className="w-3 h-3 mr-1" />
-                              {session.therapistName}
+                              {session.therapist?.name || 'Terapis'}
                             </div>
                             <div className="flex gap-1">
                               <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
@@ -388,23 +523,32 @@ export default function ParentSchedulePage() {
               <CardDescription>Sesi terapi yang akan datang untuk {currentChild?.name}</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {upcomingSessions.map((session) => (
+              {upcomingSessions.length === 0 ? (
+                <div className="text-center py-12">
+                  <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 mb-2">Tidak ada sesi mendatang</p>
+                  <p className="text-sm text-gray-400">
+                    Sesi terapi dalam 7 hari ke depan akan ditampilkan di sini
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {upcomingSessions.map((session) => (
                   <div key={session.id} className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <h4 className="font-medium text-gray-900 mb-1">
-                          {session.date.toLocaleDateString('id-ID', {
+                          {new Date(session.date).toLocaleDateString('id-ID', {
                             weekday: 'long',
                             day: 'numeric',
                             month: 'long'
                           })}
                         </h4>
                         <p className="text-sm text-gray-600">
-                          {session.date.toLocaleTimeString('id-ID', { 
+                          {new Date(session.date).toLocaleTimeString('id-ID', { 
                             hour: '2-digit', 
                             minute: '2-digit' 
-                          })} - {session.duration} menit
+                          })} - {session.duration || 60} menit
                         </p>
                       </div>
                       {getStatusBadge(session.status)}
@@ -415,11 +559,11 @@ export default function ParentSchedulePage() {
                     <div className="space-y-2 text-xs text-gray-500">
                       <div className="flex items-center">
                         <User className="w-3 h-3 mr-2" />
-                        {session.therapistName}
+                        {session.therapist?.name || 'Terapis'}
                       </div>
                       <div className="flex items-center">
                         <MapPin className="w-3 h-3 mr-2" />
-                        {session.location}
+                        {session.location || 'Ruang Terapi A - Lantai 2'}
                       </div>
                     </div>
                     
@@ -432,39 +576,15 @@ export default function ParentSchedulePage() {
                         <Eye className="w-3 h-3" />
                       </Button>
                     </div>
-                  </div>
-                ))}
-              </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
           {/* Quick Actions */}
-          <Card className="border-0 shadow-lg mt-8">
-            <CardHeader>
-              <CardTitle className="text-xl">Aksi Cepat</CardTitle>
-              <CardDescription>Fitur-fitur untuk mengelola jadwal terapi</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Button variant="outline" className="h-20 flex flex-col gap-2">
-                  <Plus className="w-5 h-5" />
-                  <span className="text-sm">Jadwalkan Sesi</span>
-                </Button>
-                <Button variant="outline" className="h-20 flex flex-col gap-2">
-                  <MessageSquare className="w-5 h-5" />
-                  <span className="text-sm">Hubungi Terapis</span>
-                </Button>
-                <Button variant="outline" className="h-20 flex flex-col gap-2">
-                  <Download className="w-5 h-5" />
-                  <span className="text-sm">Export Jadwal</span>
-                </Button>
-                <Button variant="outline" className="h-20 flex flex-col gap-2">
-                  <AlertCircle className="w-5 h-5" />
-                  <span className="text-sm">Laporkan Masalah</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          
         </div>
       </div>
     </div>

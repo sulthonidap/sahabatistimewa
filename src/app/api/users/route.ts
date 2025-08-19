@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import bcrypt from 'bcryptjs'
+import { requireRole } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
+    // Require ADMIN role to access user data
+    await requireRole(request, ['ADMIN'])
+
     const { searchParams } = new URL(request.url)
     const role = searchParams.get('role')
     const search = searchParams.get('search')
@@ -41,6 +45,18 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Get users error:', error)
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+    if (error instanceof Error && error.message === 'Forbidden') {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
+      )
+    }
     return NextResponse.json(
       { error: 'Terjadi kesalahan server' },
       { status: 500 }
@@ -50,6 +66,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Require ADMIN role to create users
+    await requireRole(request, ['ADMIN'])
+
     const body = await request.json()
     const { email, name, role, password } = body
 
@@ -110,6 +129,18 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
   } catch (error) {
     console.error('Create user error:', error)
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+    if (error instanceof Error && error.message === 'Forbidden') {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
+      )
+    }
     return NextResponse.json(
       { error: 'Terjadi kesalahan server' },
       { status: 500 }
@@ -119,6 +150,9 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    // Require ADMIN role to delete users
+    await requireRole(request, ['ADMIN'])
+
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
@@ -152,6 +186,18 @@ export async function DELETE(request: NextRequest) {
     })
   } catch (error) {
     console.error('Delete user error:', error)
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+    if (error instanceof Error && error.message === 'Forbidden') {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
+      )
+    }
     return NextResponse.json(
       { error: 'Terjadi kesalahan server' },
       { status: 500 }
