@@ -166,7 +166,7 @@ export default function LoginPage() {
               </Button>
             </form>
             
-            <div className="relative">
+            {/* <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-200"></div>
               </div>
@@ -188,9 +188,9 @@ export default function LoginPage() {
                 </svg>
                 Masuk dengan Google
               </Button>
-            </div>
+            </div> */}
             
-            <div className="text-center">
+            {/* <div className="text-center">
               <p className="text-sm text-gray-600">
                 Belum punya akun?{' '}
                 <Link 
@@ -200,7 +200,7 @@ export default function LoginPage() {
                   Daftar sekarang
                 </Link>
               </p>
-            </div>
+            </div> */}
           </CardContent>
         </Card>
         
@@ -209,16 +209,16 @@ export default function LoginPage() {
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Demo Credentials:</h3>
           <div className="space-y-2 text-xs text-gray-600">
             <div>
-              <strong>Admin:</strong> admin@anakhebat.com / password
+              <strong>Admin:</strong> admin@sahabatistimewa.com / admin123
             </div>
             <div>
-              <strong>Parent:</strong> sari.parent@email.com / password
+              <strong>Parent:</strong> sari.parent@email.com / admin123
             </div>
             <div>
-              <strong>Therapist:</strong> dr.budi@anakhebat.com / password
+              <strong>Therapist:</strong> dr.budi@sahabatistimewa.com / admin123
             </div>
             <div>
-              <strong>Psychologist:</strong> dr.ani@anakhebat.com / password
+              <strong>Psychologist:</strong> dr.ani@sahabatistimewa.com / admin123
             </div>
           </div>
         </div>
