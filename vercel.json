@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build:vercel",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "framework": "nextjs",
@@ -7,6 +7,11 @@
   "functions": {
     "src/app/api/**/*.ts": {
       "maxDuration": 30
+    }
+  },
+  "build": {
+    "env": {
+      "DATABASE_URL": "@database_url"
     }
   }
 }
